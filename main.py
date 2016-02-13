@@ -6,7 +6,7 @@ import pylab as plt
 
 from fastish_pca import fastish_PCA
 from scipy.ndimage import imread
-from sklearn.linear_model import Ridge
+from sklearn.kernel_ridge import KernelRidge
 
 TRAINING_FACES_FILEPATH = 'training.csv'
 NEUTRAL_FACES_BLOB = 'faces_dataset/*a*'
@@ -26,7 +26,11 @@ U, s, V = fastish_PCA(training_faces, BOTTLENECK, 2)
 start = time.time() - start
 print "Done in %.2fs" % start
 
+print "Found eigenvalues"
+print s
+
 print "Loading faces (neutral) ..."
+
 start = time.time()
 neutral = []
 for filename in sorted(glob.glob(NEUTRAL_FACES_BLOB)):
@@ -46,9 +50,12 @@ print "Done in %.2fs" % start
 
 print "Performing Ridge Regression ..."
 start = time.time()
-ridge = Ridge(.5).fit(neutral, happy)
+ridge = KernelRidge(alpha=.5, kernel='rbf').fit(neutral, happy)
 start = time.time() - start
 print "Done in %.2fs" % start
+
+plt.imshow(1 - ridge.predict(V.T.dot(imread("test.jpg", flatten=True).flatten()).reshape((1, -1))).reshape(IMG_SHAPE), cmap='Greys')
+plt.show()
 
 f = plt.figure()
 k = 3
@@ -59,17 +66,22 @@ for i, filename in enumerate(glob.glob(NEUTRAL_FACES_BLOB)):
 
   img = imread(filename, flatten=True)
   img2 = imread(filename2, flatten=True)
+
+  representation = V.T.dot(img.flatten())
+
+  reconstruction = V.dot(representation).reshape(IMG_SHAPE)
+  prediction = ridge.predict(representation.reshape((1, -1))).reshape(IMG_SHAPE)
   
   f.add_subplot(k, 4, 4*i + 1)
   plt.imshow(1 - img, cmap='Greys')
 
   f.add_subplot(k, 4, 4*i + 2)
-  plt.imshow(1 - V.dot(V.T.dot(img.flatten())).reshape(IMG_SHAPE), cmap='Greys')
+  plt.imshow(1 - reconstruction, cmap='Greys')
   
   f.add_subplot(k, 4, 4*i + 3)
   plt.imshow(1 - img2, cmap='Greys')
 
   f.add_subplot(k, 4, 4*i + 4)
-  plt.imshow(1 - ridge.predict(V.T.dot(img.flatten())).reshape(IMG_SHAPE), cmap='Greys')
+  plt.imshow(1 - prediction, cmap='Greys')
 plt.show()
 
