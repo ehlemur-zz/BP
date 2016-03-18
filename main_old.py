@@ -10,12 +10,13 @@ import pylab as plt
 import lemur_util
 
 # lemur from .. import ..
-from lemur_kernel import LemurKernel
-from lemur_soar import LemurSoar
+from lemur_krr import LemurKRR
+from lemur_pca import LemurPCA
 from lemur_timer import LemurTimer
 
-# A bunch of faces
-FACES_CSV = 'faces.csv'
+# LemurPCA parameters
+PCA_EPOCHS = 100
+PCA_BATCH_SIZE = 13
 
 # Neutral and smiling faces
 NEUTRAL_FACES_GLOB = 'faces/*a*'
@@ -30,35 +31,33 @@ REPEAT = 1
 N_TEST = 5
 N_TRAINING = N_IMAGES - N_TEST
 
-# Load neutral faces
+# Load (and repeat) neutral faces
 with LemurTimer("loading neutral faces"):
   neutral = []
   for filename in sorted(glob.glob(NEUTRAL_FACES_GLOB)):
     neutral.append(scipy.ndimage.imread(filename, flatten=True).flatten() / 255)
   neutral = np.array(neutral)
 
-# Load smiling faces
+# Load (and repeat) smiling faces
 with LemurTimer("loading smiling faces"):
   smiling = []
   for filename in sorted(glob.glob(SMILING_FACES_GLOB)):
     smiling.append(scipy.ndimage.imread(filename, flatten=True).flatten() / 255)
   smiling = np.array(smiling)
 
-# Shuffle images
-p = np.random.permutation(smiling.shape[0])
+# Approximate PCA by the lemur method :P
+with LemurTimer("approximating PCA"):
+  pca = LemurPCA(PCA_BATCH_SIZE, PCA_EPOCHS)
 
-neutral = neutral[p]
-smiling = smiling[p]
-# # Load ~7k faces
-# with LemurTimer("loading ~7k faces"):
-#   faces = np.loadtxt(FACES_CSV) / 255
-
-with LemurTimer("training lemur_idea"):
-  lemur_soar = LemurSoar(neutral[:N_TRAINING], smiling[:N_TRAINING], 
-                         LemurKernel(), override=True)
-
-with LemurTimer("predicting smiling faces from test set"):
-  prediction = lemur_soar.predict(neutral[N_TRAINING:])
+# Perform Kernel Ridge Regression using pca as the kernel
+neutral_training = lemur_util.distort(neutral[:N_TRAINING].repeat(REPEAT, axis=0))
+smiling_training = smiling[:N_TRAINING].repeat(REPEAT, axis=0)
+with LemurTimer("performing KRR"):
+  krr = LemurKRR(pca, neutral_training, smiling_training)
+ 
+# Predict the smiling faces from the neutral ones
+with LemurTimer("predicting smiling faces"):
+  prediction = krr(neutral[-N_TEST:]).T
 
 # Display the neutral, smiling and predicted faces side to side
 # one row per test image
@@ -77,8 +76,8 @@ plt.show()
 
 # one row per train image
 
-with LemurTimer("predicting smiling faces from training set"):
-  prediction = lemur_soar.predict(neutral[:N_TEST])
+with LemurTimer("predicting smiling faces"):
+  prediction = krr(neutral[:N_TEST]).T
 
 # Display the neutral, smiling and predicted faces side to side
 # Predict the smiling faces from the neutral ones
