@@ -1,78 +1,44 @@
 import os.path
-import threading
-
 import numpy as np
 
 import lemur_util
 
-from lemur_timer import LemurTimer
+def lemur_PCA(in_filename, k, i, power_method=False, out_filename='PCA.txt',
+              override=False):
+  if not override and os.path.isfile(out_filename):
+    return np.loadtxt(out_filename)
 
-class LemurPCA:
-  def __init__(self, batch_size, n_epochs=None, faces_csv='faces.csv',
-               output_filename='lemur_pca.txt', override=False):
-    if os.path.isfile(output_filename) and not override:
-      self.H = np.loadtxt(output_filename)
-      return
-    
-    with LemurTimer("loading input file..."):
-      self.A = np.loadtxt(faces_csv) / 255
+  A = np.loadtxt(in_filename) / 255
 
-    self.batch_size = batch_size
+  transposed = False
+  if A.shape[0] < A.shape[1]:
+    A = A.T
+    transposed = True
 
-    self.pca = threading.Lock()
-    self.output_file = threading.Lock()
-    self.output_filename = output_filename
+  m = A.shape[0]
+  n = A.shape[1]
+  l = k + 2
 
-    d = self.A.shape[1]
-    self.H = np.zeros((d, d))
+  G = np.random.randn(n, l)
 
-    try:
-      if n_epochs is not None:
-        for _ in range(n_epochs):
-          self._update()
-      else:
-        self._update()
-        while True:
-          update_thread = _UpdateThread(self)
-          save_thread = _SaveThread(self) 
-          update_thread.start()
-          save_thread.start()
-          update_thread.join()
-    finally:
-      self._save()
+  if power_method:
+    H = A.dot(G)
+    for _ in range(i):
+      H = A.dot(A.T.dot(H))
+  else:
+    H = [A.dot(G)]
+    for _ in range(i):
+      H.append(A.dot(A.T.dot(H[-1])))
+    H = np.array(map(np.transpose, H)).reshape((i + 1) * l, m).T
 
-  def __call__(self, X, Y):
-    return X.dot(self.H.dot(Y.T))
+  Q = np.linalg.qr(H)[0]
+  T = A.T.dot(Q)
+  Vt, s, W = np.linalg.svd(T, full_matrices=False)
 
-  def _update(self):
-    n = self.A.shape[0]
-    js = np.random.random_integers(0, n - 1, size=self.batch_size)
-    batch = lemur_util.distort(self.A[js])
-    self.pca.acquire()
-    self.H += batch.T.dot(batch)
-    self.pca.release()
-  
-  def _save(self):
-    if self.output_file.acquire(False):
-      with LemurTimer("saving file"):
-        self.pca.acquire()
-        A = self.H.copy()
-        self.pca.release()
-        np.savetxt(self.output_filename, A)
-        self.output_file.release()
+  if transposed:
+    V = Q.dot(W.T)[:,:k]
+  else:
+    V = Vt[:,:k]
 
-class _UpdateThread(threading.Thread):
-  def __init__(self, pca):
-    threading.Thread.__init__(self)
-    self.pca = pca
-  def run(self):
-    with LemurTimer("epoch"):
-      self.pca._update()
-
-class _SaveThread(threading.Thread):
-  def __init__(self, pca):
-    threading.Thread.__init__(self)
-    self.pca = pca
-  def run(self):
-    self.pca._save()
-
+  np.savetxt(out_filename, V)
+  return V

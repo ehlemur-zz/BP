@@ -1,6 +1,6 @@
 import numpy as np
 
-def distort(A, scale=.01):
+def distort(A, scale=.1):
   return np.clip(A + np.random.normal(scale=scale, size=A.shape), 0, 1)
 
 def dot(*Ms):

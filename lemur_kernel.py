@@ -3,38 +3,24 @@ import numpy as np
 import lemur_util
 
 class LemurKernel:
-  def __init__(self, kr=2, kc=3, d=96, s=40):
-    self.kr = kr
-    self.kc = kc
+  def __init__(self, d=96):
     self.d = d
-    self.s = s
 
-  def x(self, X, Y):
-    n = X.shape[1]
-    m = Y.shape[1]
+  def set_x(self, X1, X2):
+    self.X = self._dmatrix(X1, X2)
 
-    K = np.zeros((n, m))
+  def set_y(self, Y1, Y2):
+    self.Y1 = Y1
+    self.Y2 = Y2
+    self.Y = self._dmatrix(Y1, Y2)
 
-    for i in range(n):
-      x = X.T[i]
-      for j in range(m):
-        y = Y.T[j]
-        d = x - y
-        K[i][j] = np.exp(-.5 * (np.dot(d, d))/self.s) 
+  def __call__(self, k):
+    K = self._dmatrix(self.Y1[:,k].reshape(-1, 1), self.Y2[:,k].reshape(-1, 1))
+    return np.exp(-.5 * (self.X + self.Y - K + 1)/8000)
 
-    return K
-
-  def y(self, X, Y, i):
-    n = X.shape[1]
-    m = Y.shape[1]
-
-    x = X[i]
-    y = Y[i]
-
-    K = np.ones((n, m))
-    for i in range(n):
-      d = x[i] - y
-      K[i] = np.exp(-.5 * d*d/self.s)
-
+  def _dmatrix(self, X, Y):
+    K = np.zeros((X.shape[0], Y.shape[0]))
+    for i in range(Y.shape[0]):
+      K[:,i] = np.sum((X - Y[i])**2, axis=1)
     return K
     
