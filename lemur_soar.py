@@ -6,13 +6,13 @@ import sklearn.linear_model
 import lemur_util
 from lemur_whitening import LemurWhitening
 
-class LemurSoar:
+class LemurSOAR:
   def __init__(self, neutral, smiling, kernel, repeat=1, alpha=1,
                override=False, filename='SOAR.txt'):
     self.n, self.d = smiling.shape
 
     M = np.linalg.inv(neutral.dot(neutral.T) + alpha * np.eye(self.n))
-    self.W = lemur_util.dot(neutral.T, M, smiling)
+    self.W = lemur_util.dot(neutral.T, M, (smiling - neutral))
     
     self.neutral = neutral
     self.smiling = smiling
@@ -44,7 +44,7 @@ class LemurSoar:
     return y
 
   def predict(self, X, epochs=300, tol=1e-7):
-    Y = X.dot(self.W)
+    Y = X.dot(self.W) + X
     self.kernel.set_x(X, self.neutral)
     for _ in range(epochs):
       Y2 = self.step(Y)

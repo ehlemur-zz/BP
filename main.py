@@ -12,7 +12,7 @@ import lemur_util
 # lemur from .. import ..
 from lemur_kernel import LemurKernel
 from lemur_pca import lemur_PCA
-from lemur_soar import LemurSoar
+from lemur_soar import LemurSOAR
 from lemur_timer import LemurTimer
 
 # A bunch of faces
@@ -53,7 +53,7 @@ neutral = neutral[p]
 smiling = smiling[p]
 
 with LemurTimer("calculating PCA"):
-  V = np.eye(neutral.shape[1]);#lemur_PCA(FACES, BOTTLENECK, 2)
+  V = lemur_PCA(FACES, BOTTLENECK, 2)
 
   neutral_pca = neutral.dot(V)
   smiling_pca = smiling.dot(V)
@@ -63,11 +63,32 @@ with LemurTimer("training lemur_idea"):
                                smiling_pca[:N_TRAINING], axis=0)
   smiling_training = np.append(smiling_pca[:N_TRAINING],
                                smiling_pca[:N_TRAINING], axis=0)
-  lemur_soar = LemurSoar(neutral_training, smiling_training,
+  lemur_soar = LemurSOAR(neutral_training, smiling_training,
                          LemurKernel(), override=True)
 
 with LemurTimer("predicting smiling faces from test set"):
   prediction = lemur_soar.predict(neutral_pca[N_TRAINING:]).dot(V.T)
+
+# Display the neutral, smiling and predicted faces side to side
+# one row per test image
+f = plt.figure()
+for i in range(N_TEST):
+  k = N_TRAINING + i
+
+  f.add_subplot(N_TEST, 4, 4*i + 1)
+  plt.imshow(1 - neutral[k].reshape(IMG_SHAPE), cmap='Greys')
+  f.add_subplot(N_TEST, 4, 4*i + 2)
+  plt.imshow(1 - smiling[k].reshape(IMG_SHAPE), cmap='Greys')
+  f.add_subplot(N_TEST, 4, 4*i + 3)
+  plt.imshow(1 - neutral_pca[k].dot(V.T).reshape(IMG_SHAPE), cmap='Greys')
+  f.add_subplot(N_TEST, 4, 4*i + 4)
+  plt.imshow(1 - prediction[i].reshape(IMG_SHAPE), cmap='Greys')
+
+plt.show()
+
+
+with LemurTimer("predicting smiling faces from test set"):
+  prediction = lemur_soar.predict(smiling_pca[N_TRAINING:]).dot(V.T)
 
 # Display the neutral, smiling and predicted faces side to side
 # one row per test image
