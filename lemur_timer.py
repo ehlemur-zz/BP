@@ -19,5 +19,5 @@ class LemurTimer:
     if t >= 60:
       m = int(t / 60)
       s = int(t - 60 * m)
-      return "%dm %d" % (m, s)
+      return "%dm %ds" % (m, s)
     return "%.2fs" % t
